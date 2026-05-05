@@ -86,7 +86,7 @@ That is enough to make it useful and easy to explain.
 ## Project Structure
 
 ```text
-voice_typing_assistant/
+Voicetype/
 ├─ README.md
 ├─ requirements.txt
 ├─ run.py
