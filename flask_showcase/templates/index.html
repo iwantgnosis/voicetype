@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Voice Typing Assistant — Offline AI Voice Input for Windows</title>
+  <meta name="description" content="A tiny floating voice assistant that transcribes speech locally using Whisper AI. No cloud, no API keys, no subscription. Built with Python.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="{{ url_for('static', filename='img/favicon.png') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+  <!-- ── Navigation ─────────────────────────────────────────────── -->
+  <nav class="nav" id="nav">
+    <div class="nav-inner">
+      <a href="#" class="nav-brand">
+        <span class="nav-dot"></span>
+        <span>VoiceType</span>
+      </a>
+      <div class="nav-links">
+        <a href="#features">Features</a>
+        <a href="#how">How It Works</a>
+        <a href="#tech">Tech Stack</a>
+        <a href="#install" class="nav-cta">Get Started</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- ── Hero ───────────────────────────────────────────────────── -->
+  <section class="hero">
+    <div class="hero-glow"></div>
+    <div class="container">
+      <div class="hero-content fade-up">
+        <span class="badge">100% Offline · Powered by Whisper AI</span>
+        <h1>Voice typing,<br><span class="gradient-text">reimagined.</span></h1>
+        <p class="hero-sub">A tiny floating pill that listens, transcribes, and pastes — right into any search bar, editor, or chat. No cloud. No API keys. Just speak.</p>
+        <div class="hero-btns">
+          <a href="#install" class="btn btn-primary">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Download for Windows
+          </a>
+          <a href="#how" class="btn btn-ghost">See How It Works →</a>
+        </div>
+      </div>
+
+      <!-- Interactive pill demo -->
+      <div class="hero-demo fade-up delay-1">
+        <div class="demo-window">
+          <div class="demo-dots"><span></span><span></span><span></span></div>
+          <div class="demo-url-bar">google.com</div>
+          <div class="demo-search-area">
+            <div class="demo-search-box">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#999" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+              <span class="typed-text" id="typed-text"></span>
+              <span class="cursor-blink">|</span>
+            </div>
+          </div>
+          <!-- Floating pill inside the demo -->
+          <div class="pill-widget" id="pill-widget">
+            <div class="pill-glow" id="pill-glow"></div>
+            <div class="pill-body">
+              <div class="pill-dot" id="pill-dot"></div>
+              <span class="pill-label" id="pill-label">Ready</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Features ───────────────────────────────────────────────── -->
+  <section class="section" id="features">
+    <div class="container">
+      <div class="section-head fade-up">
+        <span class="badge">Core Features</span>
+        <h2>Everything you need,<br>nothing you don't.</h2>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card fade-up">
+          <div class="feature-icon">🔒</div>
+          <h3>100% Offline</h3>
+          <p>Runs Whisper locally on your machine. Your voice data never leaves your PC — ever.</p>
+        </div>
+        <div class="feature-card fade-up delay-1">
+          <div class="feature-icon">⚡</div>
+          <h3>Instant Paste</h3>
+          <p>Transcribed text is pasted directly into the active field — search bars, editors, chat boxes.</p>
+        </div>
+        <div class="feature-card fade-up delay-2">
+          <div class="feature-icon">🪶</div>
+          <h3>Ultra Compact</h3>
+          <p>A tiny curved pill widget. Sits at the top of your screen and never blocks your work.</p>
+        </div>
+        <div class="feature-card fade-up">
+          <div class="feature-icon">⌨️</div>
+          <h3>Global Hotkey</h3>
+          <p>Press Ctrl+Alt+Space anywhere — Chrome, Notepad, Word, Slack. It just works.</p>
+        </div>
+        <div class="feature-card fade-up delay-1">
+          <div class="feature-icon">🎨</div>
+          <h3>Premium Design</h3>
+          <p>Dynamic Island-style floating widget with smooth glow animations and anti-aliased rendering.</p>
+        </div>
+        <div class="feature-card fade-up delay-2">
+          <div class="feature-icon">⚙️</div>
+          <h3>Fully Configurable</h3>
+          <p>Choose your Whisper model, set custom hotkeys, toggle auto-paste or copy-only mode.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── How It Works ───────────────────────────────────────────── -->
+  <section class="section section-dark" id="how">
+    <div class="container">
+      <div class="section-head fade-up">
+        <span class="badge">How It Works</span>
+        <h2>Three steps.<br>Zero friction.</h2>
+      </div>
+      <div class="steps">
+        <div class="step fade-up">
+          <div class="step-num">01</div>
+          <div class="step-content">
+            <h3>Press the Hotkey</h3>
+            <p>Hit <kbd>Ctrl</kbd> + <kbd>Alt</kbd> + <kbd>Space</kbd> from anywhere. The pill glows teal — it's listening.</p>
+          </div>
+        </div>
+        <div class="step fade-up delay-1">
+          <div class="step-num">02</div>
+          <div class="step-content">
+            <h3>Speak Naturally</h3>
+            <p>Talk as you normally would. Whisper AI processes your speech entirely on your local machine.</p>
+          </div>
+        </div>
+        <div class="step fade-up delay-2">
+          <div class="step-num">03</div>
+          <div class="step-content">
+            <h3>Text Appears Instantly</h3>
+            <p>Your words are typed into the active field automatically. Or copied to clipboard — your choice.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode cards -->
+      <div class="modes fade-up">
+        <div class="mode-card">
+          <span class="mode-tag">Mode A</span>
+          <h3>Auto Paste</h3>
+          <p>Text is pasted directly into the active search bar, form, editor, or chat box after transcription.</p>
+        </div>
+        <div class="mode-card">
+          <span class="mode-tag">Mode B</span>
+          <h3>Copy Only</h3>
+          <p>Transcript is copied to the clipboard silently. Paste it wherever and whenever you want.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Tech Stack ─────────────────────────────────────────────── -->
+  <section class="section" id="tech">
+    <div class="container">
+      <div class="section-head fade-up">
+        <span class="badge">Python Stack</span>
+        <h2>Built entirely<br>with Python.</h2>
+      </div>
+      <div class="tech-grid fade-up">
+        <div class="tech-item">
+          <span class="tech-name">PySide6</span>
+          <span class="tech-desc">Qt6 GUI — frameless transparent widget</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">faster-whisper</span>
+          <span class="tech-desc">Local Whisper speech-to-text</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">sounddevice</span>
+          <span class="tech-desc">Real-time microphone capture</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">keyboard</span>
+          <span class="tech-desc">Global system hotkey hooks</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">Flask</span>
+          <span class="tech-desc">Showcase website backend</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">pyperclip</span>
+          <span class="tech-desc">Cross-platform clipboard access</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">numpy</span>
+          <span class="tech-desc">Audio buffer processing</span>
+        </div>
+        <div class="tech-item">
+          <span class="tech-name">pystray</span>
+          <span class="tech-desc">System tray integration</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Install ────────────────────────────────────────────────── -->
+  <section class="section section-dark" id="install">
+    <div class="container">
+      <div class="section-head fade-up">
+        <span class="badge">Quick Start</span>
+        <h2>Up and running<br>in 60 seconds.</h2>
+      </div>
+      <div class="install-card fade-up">
+        <pre><code><span class="cmd-comment"># Clone the repo</span>
+git clone https://github.com/yourname/voice-typing-assistant.git
+cd voice-typing-assistant
+
+<span class="cmd-comment"># Create virtual environment</span>
+python -m venv .venv
+.venv\Scripts\activate
+
+<span class="cmd-comment"># Install dependencies</span>
+pip install -r requirements.txt
+
+<span class="cmd-comment"># Launch the assistant</span>
+python app.py</code></pre>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Footer ─────────────────────────────────────────────────── -->
+  <footer class="footer">
+    <div class="container footer-inner">
+      <div class="footer-brand">
+        <span class="nav-dot"></span>
+        <span>VoiceType</span>
+      </div>
+      <p>Built with Python · Offline AI · Open Source</p>
+    </div>
+  </footer>
+
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
