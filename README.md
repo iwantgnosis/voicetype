@@ -89,6 +89,7 @@ That is enough to make it useful and easy to explain.
 voice_typing_assistant/
 ├─ README.md
 ├─ requirements.txt
+├─ run.py
 ├─ app.py
 ├─ gui.py
 ├─ hotkeys.py
@@ -96,8 +97,16 @@ voice_typing_assistant/
 ├─ settings.py
 ├─ startup.py
 ├─ transcriber.py
-└─ typer.py
+├─ typer.py
+└─ flask_showcase/
+    ├─ app.py
+    ├─ static/
+    └─ templates/
 ```
+
+### Flask Showcase Website
+
+The project also includes a Flask-based showcase website (located in `flask_showcase/`) that provides a high-fidelity interactive preview of the "Dynamic Island" style voice widget, demonstrating the premium UI/UX design and animations.
 
 ---
 
