@@ -1,8 +1,3 @@
-/* ═══════════════════════════════════════════════════════════════════
-   Voice Typing Assistant — Showcase Interactions
-   ═══════════════════════════════════════════════════════════════════ */
-
-// ── Scroll reveal (Intersection Observer) ──────────────────────────
 const observer = new IntersectionObserver(
   (entries) => {
     entries.forEach((entry) => {
@@ -16,19 +11,18 @@ const observer = new IntersectionObserver(
 
 document.querySelectorAll(".fade-up").forEach((el) => observer.observe(el));
 
-// ── Interactive pill widget demo ───────────────────────────────────
 const pill = document.getElementById("pill-widget");
 const pillLabel = document.getElementById("pill-label");
-const pillDot = document.getElementById("pill-dot");
 const typedText = document.getElementById("typed-text");
 
-const demoText = "AI give me best python project";
+const demoText = "voice type is ready and working";
 
 const states = [
-  { cls: "", label: "Ready", duration: 2000 },
-  { cls: "listening", label: "Listening…", duration: 3000 },
-  { cls: "processing", label: "Processing…", duration: 1800 },
-  { cls: "done", label: "Inserted ✓", duration: 2000 },
+  { cls: "done", label: "I am ready", duration: 2200 },
+  { cls: "", label: "Ready", duration: 1400 },
+  { cls: "listening", label: "Listening...", duration: 2800 },
+  { cls: "processing", label: "Processing...", duration: 1700 },
+  { cls: "done", label: "Inserted", duration: 2200 },
 ];
 
 let stateIndex = 0;
@@ -42,8 +36,8 @@ function clearPillState() {
 function typeText() {
   if (charIndex <= demoText.length) {
     typedText.textContent = demoText.substring(0, charIndex);
-    charIndex++;
-  } else {
+    charIndex += 1;
+  } else if (typeInterval) {
     clearInterval(typeInterval);
     typeInterval = null;
   }
@@ -53,29 +47,26 @@ function runDemo() {
   const state = states[stateIndex];
 
   clearPillState();
-  if (state.cls) pill.classList.add(state.cls);
+  if (state.cls) {
+    pill.classList.add(state.cls);
+  }
   pillLabel.textContent = state.label;
 
-  // Start typing when we hit "done" state
-  if (state.cls === "done" && charIndex === 0) {
-    typeInterval = setInterval(typeText, 55);
-  }
-
-  // Reset text when going back to "Ready"
-  if (state.cls === "" && stateIndex === 0) {
+  if (state.label === "I am ready") {
     charIndex = 0;
     typedText.textContent = "";
   }
 
-  stateIndex = (stateIndex + 1) % states.length;
+  if (state.label === "Inserted" && charIndex === 0 && !typeInterval) {
+    typeInterval = setInterval(typeText, 55);
+  }
 
+  stateIndex = (stateIndex + 1) % states.length;
   setTimeout(runDemo, state.duration);
 }
 
-// Start the demo loop after a short delay
 setTimeout(runDemo, 1200);
 
-// ── Sticky nav background on scroll ───────────────────────────────
 const nav = document.getElementById("nav");
 window.addEventListener("scroll", () => {
   if (window.scrollY > 40) {

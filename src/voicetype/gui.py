@@ -11,27 +11,25 @@ import threading
 from pathlib import Path
 
 import pyperclip
-import pystray
-from PIL import Image as PILImage, ImageDraw as PILDraw
 from PySide6.QtCore import (
     Qt, QPointF, QRectF, QTimer, Signal, Slot, QPoint,
     QPropertyAnimation, QEasingCurve, QParallelAnimationGroup
 )
 from PySide6.QtGui import (
-    QColor, QCursor, QFont, QLinearGradient, QPainter, QPen, QIcon
+    QColor, QCursor, QFont, QLinearGradient, QPainter, QPen, QIcon, QAction
 )
 from PySide6.QtWidgets import (
     QApplication, QCheckBox, QComboBox, QDialog, QFormLayout,
     QHBoxLayout, QLabel, QLineEdit, QMenu, QPushButton,
-    QTextEdit, QVBoxLayout, QWidget,
+    QTextEdit, QVBoxLayout, QWidget, QSystemTrayIcon,
 )
 
-from .hotkeys import HotkeyManager
-from .recorder import AudioRecorder
 from .settings import load_settings, save_settings
 from .startup import is_enabled, set_enabled
-from .transcriber import WhisperTranscriber
 from .typer import paste_text
+from .logger import get_logger
+
+logger = get_logger("gui")
 
 # ── Layout constants ────────────────────────────────────────────────────
 PILL_W, PILL_H = 190, 38
@@ -61,9 +59,9 @@ class PillWidget(QWidget):
     def __init__(self, start_hidden=False):
         super().__init__()
         self.settings = load_settings()
-        self.recorder = AudioRecorder()
-        self.transcriber = WhisperTranscriber()
-        self.hotkeys = HotkeyManager()
+        self.recorder = None
+        self.transcriber = None
+        self.hotkeys = None
 
         self._state = "idle"
         self._label = "Ready"
@@ -74,6 +72,8 @@ class PillWidget(QWidget):
         self._tray_icon = None
         self._toast_id = None
         self._is_visible_on_screen = False
+        self._startup_complete = False
+        self._warmup_started = False
 
         # Window flags: frameless, topmost, hidden from taskbar, transparent
         self.setWindowFlags(
@@ -107,18 +107,17 @@ class PillWidget(QWidget):
         # Signals (thread-safe Qt bridge)
         self._hotkey_sig.connect(self.toggle_recording)
         self._done_sig.connect(self._handle_result)
-        self._err_sig.connect(lambda e: self._toast("Error"))
+        self._err_sig.connect(self._handle_error)
 
         # 30 fps render loop
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._on_tick)
         self._timer.start(33)
 
-        self._register_hotkey()
-        self._start_tray()
-
         if not start_hidden:
             self.slide_down()
+
+        QTimer.singleShot(0, self._finish_startup)
 
     # ── Slide Animations ────────────────────────────────────────────────
     def slide_down(self):
@@ -293,38 +292,54 @@ class PillWidget(QWidget):
             self._start()
             return
 
-        if self.recorder.is_recording:
+        recorder = self._ensure_recorder()
+        if recorder.is_recording:
             self._stop()
         else:
             self._start()
 
     def _start(self):
         try:
-            self.recorder.start()
+            logger.info("UI: Requesting start recording")
+            self._ensure_recorder().start()
             self.slide_down()
             self._set("listening", "Listening…")
         except Exception as e:
+            logger.error(f"UI: Failed to start recording: {e}", exc_info=True)
             self.slide_down()
             self._toast("Mic Error")
 
     def _stop(self):
         try:
-            audio = self.recorder.stop()
-        except Exception:
+            logger.info("UI: Requesting stop recording")
+            audio = self._ensure_recorder().stop()
+        except Exception as e:
+            logger.error(f"UI: Failed to stop recording: {e}", exc_info=True)
             self._toast("Error")
             return
         if not audio:
+            logger.warning("UI: No audio data received after stopping.")
             self._toast("No Audio")
             return
         self._set("processing", "Processing…")
+        logger.info(f"UI: Starting transcription thread (audio size: {len(audio)} bytes)")
         threading.Thread(target=self._run_whisper, args=(audio,), daemon=True).start()
 
     def _run_whisper(self, audio: bytes):
         try:
-            text = self.transcriber.transcribe_bytes(audio, self.settings["model_size"])
+            logger.info("Thread: Running Whisper transcription...")
+            text = self._ensure_transcriber().transcribe_bytes(audio, self.settings["model_size"])
+            logger.info(f"Thread: Transcription success. Result length: {len(text)}")
             self._done_sig.emit(text)
         except Exception as e:
+            logger.error(f"Thread: Transcription error: {e}", exc_info=True)
             self._err_sig.emit(str(e))
+
+    @Slot(str)
+    def _handle_error(self, err_msg: str):
+        logger.error(f"UI: Received error signal: {err_msg}")
+        self._toast("Error")
+        # Optional: Show more info in a tooltip or log file if needed
 
     @Slot(str)
     def _handle_result(self, text: str):
@@ -365,7 +380,7 @@ class PillWidget(QWidget):
     def _register_hotkey(self):
         hk = self.settings.get("hotkey", "ctrl+alt+space")
         try:
-            self.hotkeys.register(hk, lambda: self._hotkey_sig.emit())
+            self._ensure_hotkeys().register(hk, lambda: self._hotkey_sig.emit())
         except Exception:
             pass
 
@@ -389,34 +404,109 @@ class PillWidget(QWidget):
 
     # ── Tray icon ───────────────────────────────────────────────────────
     def _start_tray(self):
-        icon_path = Path(__file__).parent.parent.parent / "assets" / "icon.png"
-        if icon_path.exists():
-            img = PILImage.open(icon_path).convert("RGBA")
-            img = img.resize((64, 64), PILImage.Resampling.LANCZOS)
-        else:
-            img = PILImage.new("RGBA", (64, 64), (0, 0, 0, 0))
-            d = PILDraw.Draw(img)
-            d.rounded_rectangle((8, 8, 56, 56), radius=16, fill=(16, 23, 32))
-            d.ellipse((20, 20, 44, 44), fill=(32, 213, 195))
-            d.ellipse((27, 27, 37, 37), fill=(13, 17, 23))
-        menu = pystray.Menu(
-            pystray.MenuItem("Show Widget", lambda *a: self._show_from_tray(), default=True),
-            pystray.MenuItem("Settings", lambda *a: QTimer.singleShot(0, self._open_settings)),
-            pystray.MenuItem("Quit", lambda *a: QTimer.singleShot(0, self._quit)),
-        )
-        self._tray_icon = pystray.Icon("vta", img, "Voice Typing Assistant", menu)
-        threading.Thread(target=self._tray_icon.run, daemon=True).start()
+        if self._tray_icon is not None:
+            return
+
+        tray = QSystemTrayIcon(self.windowIcon(), self)
+        tray.setToolTip("Voice Typing Assistant")
+
+        menu = QMenu()
+        menu.setStyleSheet(_MENU_CSS)
+
+        show_action = QAction("Show Widget", menu)
+        show_action.triggered.connect(self._show_from_tray)
+        menu.addAction(show_action)
+
+        settings_action = QAction("Settings", menu)
+        settings_action.triggered.connect(self._open_settings)
+        menu.addAction(settings_action)
+
+        menu.addSeparator()
+
+        quit_action = QAction("Quit", menu)
+        quit_action.triggered.connect(self._quit)
+        menu.addAction(quit_action)
+
+        tray.setContextMenu(menu)
+        tray.activated.connect(self._on_tray_activated)
+        tray.show()
+        self._tray_icon = tray
 
     def _show_from_tray(self):
         QTimer.singleShot(0, self.slide_down)
 
+    def _on_tray_activated(self, reason):
+        if reason == QSystemTrayIcon.ActivationReason.Trigger:
+            self._show_from_tray()
+
+    def _ensure_recorder(self):
+        if self.recorder is None:
+            from .recorder import AudioRecorder
+            self.recorder = AudioRecorder()
+        return self.recorder
+
+    def _ensure_transcriber(self):
+        if self.transcriber is None:
+            from .transcriber import WhisperTranscriber
+            self.transcriber = WhisperTranscriber()
+        return self.transcriber
+
+    def _ensure_hotkeys(self):
+        if self.hotkeys is None:
+            from .hotkeys import HotkeyManager
+            self.hotkeys = HotkeyManager()
+        return self.hotkeys
+
+    def _finish_startup(self):
+        if self._startup_complete:
+            return
+
+        self._start_tray()
+        self._register_hotkey()
+        self._startup_complete = True
+        logger.info("UI: Startup complete")
+        self._announce_ready()
+        self._start_background_warmup()
+
+    def _announce_ready(self):
+        self.slide_down()
+        self._toast("I am ready", ms=2500)
+        if self._tray_icon and self._tray_icon.supportsMessages():
+            self._tray_icon.showMessage(
+                "Voice Typing Assistant",
+                "I am ready",
+                QSystemTrayIcon.Information,
+                2500,
+            )
+
+    def _start_background_warmup(self):
+        if self._warmup_started:
+            return
+
+        self._warmup_started = True
+        model_name = self.settings.get("model_size", "base")
+        threading.Thread(
+            target=self._warmup_model,
+            args=(model_name,),
+            daemon=True,
+        ).start()
+
+    def _warmup_model(self, model_name: str):
+        try:
+            logger.info(f"UI: Background warmup started for model {model_name}")
+            self._ensure_transcriber().preload_model(model_name)
+            logger.info(f"UI: Background warmup finished for model {model_name}")
+        except Exception as e:
+            logger.warning(f"UI: Background warmup failed: {e}", exc_info=True)
+
     def _quit(self):
         try:
-            self.hotkeys.unregister()
+            if self.hotkeys is not None:
+                self.hotkeys.unregister()
         except Exception:
             pass
         if self._tray_icon:
-            self._tray_icon.stop()
+            self._tray_icon.hide()
         QApplication.quit()
 
 
@@ -471,12 +561,24 @@ class _SettingsDialog(QDialog):
         self.model_cb = QComboBox()
         self.model_cb.addItems(["tiny", "base", "small"])
         self.model_cb.setCurrentText(self._s.get("model_size", "base"))
+        self.model_cb.currentTextChanged.connect(self._update_model_status)
         form.addRow("Model", self.model_cb)
+
+        self.status_lay = QHBoxLayout()
+        self.status_lbl = QLabel("Checking...")
+        self.del_btn = QPushButton("Remove")
+        self.del_btn.setFixedWidth(70)
+        self.del_btn.setStyleSheet("font-size: 10px; padding: 3px;")
+        self.del_btn.clicked.connect(self._delete_model)
+        self.status_lay.addWidget(self.status_lbl)
+        self.status_lay.addWidget(self.del_btn)
+        form.addRow("Status", self.status_lay)
 
         self.hotkey_le = QLineEdit(self._s.get("hotkey", "ctrl+alt+space"))
         form.addRow("Hotkey", self.hotkey_le)
 
         lay.addLayout(form)
+        self._update_model_status()
         lay.addSpacing(6)
 
         self.startup_chk = QCheckBox("Start with Windows")
@@ -499,6 +601,23 @@ class _SettingsDialog(QDialog):
         btns.addWidget(cancel_btn)
         btns.addWidget(save_btn)
         lay.addLayout(btns)
+
+    def _update_model_status(self):
+        m = self.model_cb.currentText()
+        if self.parent()._ensure_transcriber().is_model_downloaded(m):
+            self.status_lbl.setText("Downloaded ✓")
+            self.status_lbl.setStyleSheet("color: #3ddc84;")
+            self.del_btn.setEnabled(True)
+        else:
+            self.status_lbl.setText("Not found")
+            self.status_lbl.setStyleSheet("color: #a0b0c0;")
+            self.del_btn.setEnabled(False)
+
+    def _delete_model(self):
+        m = self.model_cb.currentText()
+        if self.parent()._ensure_transcriber().delete_model(m):
+            self._update_model_status()
+            self.parent()._toast("Model Removed")
 
     def result_settings(self) -> dict:
         s = dict(self._s)
